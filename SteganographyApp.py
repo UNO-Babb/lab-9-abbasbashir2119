@@ -1,125 +1,114 @@
-# This app will encode or decode text messages in an image file.
-# The app will use RGB channels so only PNG files will be accepted.
-# This technique will focus on Least Signifigant Bit (LSB) encoding.
-
 from PIL import Image
-import os
-
-def encode(img, msg):
-  #TODO: You need to convert the RGB to binary
-  #Then we will adjust the pixels to encode the message binary value into the last bit.
-  #Each letter will take three pixels, with a spare pixel unchanged.
-  pixels = img.load() # pixesls is the pixel map, 2-d list of data
-  width, height = img.size
-  letterSpot = 0
-  pixel = 0
-  letterBinary = ""
-  msgLength = len(msg)
-  red, green, blue = pixels[0, 0]
-  pixels[0,0] = (msgLength, green, blue)
-
-  for i in range(msgLength * 3):
-    x = i % width
-    y = i // width
-
-    red, green, blue = pixels[x, y]
-    redBinary = numberToBinary(red)
-    greenBinary = numberToBinary(green)
-    blueBinary = numberToBinary(blue)
-
-    if pixel % 3 == 0:
-      letterBinary = numberToBinary(ord(msg[letterSpot]))
-      #ignore the red on the first pixel of each letter.
-      greenBinary = greenBinary[0:7] + letterBinary[0]
-      blueBinary = blueBinary[0:7] + letterBinary[1]
-    elif pixel % 3 == 1:
-      redBinary = redBinary[0:7] + letterBinary[2]
-      greenBinary = greenBinary[0:7] + letterBinary[3]
-      blueBinary = blueBinary[0:7] + letterBinary[4]
-    else:
-      redBinary = redBinary[0:7] + letterBinary[5]
-      greenBinary = greenBinary[0:7] + letterBinary[6]
-      blueBinary = blueBinary[0:7] + letterBinary[7]
-
-      letterSpot = letterSpot + 1
-
-    red = binaryToNumber(redBinary)
-    blue = binaryToNumber(blueBinary)
-    green = binaryToNumber(greenBinary)
-
-    pixels[x,y] = (red, green, blue)
-    pixel = pixel + 1
-
-  #Save the file that has now been encoded.
-  img.save("secretImg.png", 'png')
-
-def decode(img):
-  """Takes the image file and reads the least significant bit from the RGBA channels.
-  Converts that binary to decimal to ASCII."""
-  msg = ""
-
-  pixels = img.load() #Pixels is the pixel map, a 2-dimensional list of pixel data
-  red,green,blue = pixels[0,0]
-  msgLength = red
-  width, height = img.size
-  letterSpot = 0
-  pixel = 0
-  letterBinary = ""
-  x = 0
-  y = 0
-  while len(msg) < msgLength:
-    red,green,blue = pixels[x,y]
-    redBinary = numberToBinary(red)
-    greenBinary = numberToBinary(green)
-    blueBinary = numberToBinary(blue)
-
-    if pixel % 3 == 0:
-      letterBinary = greenBinary[7] + blueBinary[7]
-
-    elif pixel % 3 == 1:
-      letterBinary = letterBinary + redBinary[7] + greenBinary[7] + blueBinary[7]
-
-    else:
-      letterBinary = letterBinary + redBinary[7] + greenBinary[7] + blueBinary[7]
-      letterAscii = binaryToNumber(letterBinary)
-      letter = chr(letterAscii)
-      msg = msg + chr(letterAscii)
-
-    pixel = pixel + 1
-    x = pixel % width
-    y = pixel // width
-
-  return msg
-
-#Helper functions
 
 def numberToBinary(num):
-  """Takes a base10 number and converts to a binary string with 8 bits"""
-  binary = ""
-  #Convert from decimal to binary
+    """Convert a number to an 8-bit binary string."""
+    return format(num, '08b')
 
+def binaryToNumber(binaryString):
+    """Convert an 8-bit binary string to a number."""
+    return int(binaryString, 2)
 
-  return binary
+def encode(img, msg):
+    """Encode a message into the image using LSB."""
+    pixels = img.load()
+    width, height = img.size
+    msgLength = len(msg)
+    letterSpot = 0
+    pixel = 0
 
-def binaryToNumber(bin):
-  """Takes a string binary value and converts it to a base10 integer."""
-  decimal = 0
+    # Store message length in the first pixel
+    r, g, b = pixels[0, 0]
+    pixels[0, 0] = (msgLength, g, b)
 
+    for i in range(msgLength * 3):
+        x = i % width
+        y = i // width
 
-  return decimal
+        r, g, b = pixels[x, y]
+        r_bin = numberToBinary(r)
+        g_bin = numberToBinary(g)
+        b_bin = numberToBinary(b)
+
+        if pixel % 3 == 0:
+            letter_bin = numberToBinary(ord(msg[letterSpot]))
+            g_bin = g_bin[:7] + letter_bin[0]
+            b_bin = b_bin[:7] + letter_bin[1]
+        elif pixel % 3 == 1:
+            g_bin = g_bin[:7] + letter_bin[3]
+            r_bin = r_bin[:7] + letter_bin[2]
+            b_bin = b_bin[:7] + letter_bin[4]
+        else:
+            r_bin = r_bin[:7] + letter_bin[5]
+            g_bin = g_bin[:7] + letter_bin[6]
+            b_bin = b_bin[:7] + letter_bin[7]
+            letterSpot += 1
+
+        pixels[x, y] = (
+            binaryToNumber(r_bin),
+            binaryToNumber(g_bin),
+            binaryToNumber(b_bin)
+        )
+
+        pixel += 1
+
+    img.save("secretImg.png", "PNG")
+
+def decode(img):
+    """Decode a message from the image."""
+    pixels = img.load()
+    width, height = img.size
+    msg = ""
+
+    r, g, b = pixels[0, 0]
+    msgLength = r
+    pixel = 0
+    letterBinary = ""
+    x = 0
+    y = 0
+
+    while len(msg) < msgLength:
+        r, g, b = pixels[x, y]
+        r_bin = numberToBinary(r)
+        g_bin = numberToBinary(g)
+        b_bin = numberToBinary(b)
+
+        if pixel % 3 == 0:
+            letterBinary = g_bin[7] + b_bin[7]
+        elif pixel % 3 == 1:
+            letterBinary += r_bin[7] + g_bin[7] + b_bin[7]
+        else:
+            letterBinary += r_bin[7] + g_bin[7] + b_bin[7]
+            msg += chr(binaryToNumber(letterBinary))
+
+        pixel += 1
+        x = pixel % width
+        y = pixel // width
+
+    return msg
 
 def main():
-  #Ask user if they want to encode/decode
-  myImg = Image.open('pki.png')
-  myMsg = "This is a secret message I will hide in an image."
-  encode(myImg, myMsg)
-  myImg.close()
+    choice = input("Do you want to (E)ncode or (D)ecode a message? ").strip().upper()
+    filename = input("Enter the name of the PNG image file: ").strip()
 
-  """
-  yourImg = Image.open('secretImg.png')
-  msg = decode(yourImg)
-  print(msg)
-  """
-    
+    if not filename.lower().endswith('.png'):
+        print("Only PNG files are supported.")
+        return
+
+    try:
+        img = Image.open(filename)
+    except FileNotFoundError:
+        print("File not found.")
+        return
+
+    if choice == 'E':
+        msg = input("Enter the message to hide: ")
+        encode(img, msg)
+        print("Message encoded and saved as secretImg.png.")
+    elif choice == 'D':
+        message = decode(img)
+        print("Decoded message:", message)
+    else:
+        print("Invalid choice.")
+
 if __name__ == '__main__':
-  main()
+    main()
